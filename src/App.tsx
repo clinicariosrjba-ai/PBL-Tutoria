@@ -295,8 +295,36 @@ function TelaGerenciador({ config, onFinalizar }: { config: AppState, onFinaliza
   const [totalActiveSeconds, setTotalActiveSeconds] = useState(0);
   const [showSummary, setShowSummary] = useState(false);
   const [stats, setStats] = useState<Record<string, number>>({});
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
-  const sessionTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const timerRef = useRef<any>(null);
+  const sessionTimerRef = useRef<any>(null);
+
+  // Persistence: Save state to localStorage
+  useEffect(() => {
+    const savedState = localStorage.getItem('pbl_session_state');
+    if (savedState) {
+      try {
+        const parsed = JSON.parse(savedState);
+        setObjetivoAtual(parsed.objetivoAtual || 0);
+        setFilaFalas(parsed.filaFalas || []);
+        setObjetivosFinalizados(parsed.objetivosFinalizados || []);
+        setTotalActiveSeconds(parsed.totalActiveSeconds || 0);
+        setStats(parsed.stats || {});
+      } catch (e) {
+        console.error("Erro ao carregar estado salvo:", e);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    const stateToSave = {
+      objetivoAtual,
+      filaFalas,
+      objetivosFinalizados,
+      totalActiveSeconds,
+      stats
+    };
+    localStorage.setItem('pbl_session_state', JSON.stringify(stateToSave));
+  }, [objetivoAtual, filaFalas, objetivosFinalizados, totalActiveSeconds, stats]);
 
   useEffect(() => {
     sessionTimerRef.current = setInterval(() => {
@@ -304,7 +332,9 @@ function TelaGerenciador({ config, onFinalizar }: { config: AppState, onFinaliza
         setTotalActiveSeconds(prev => prev + 1);
       }
     }, 1000);
-    return () => clearInterval(sessionTimerRef.current!);
+    return () => {
+      if (sessionTimerRef.current) clearInterval(sessionTimerRef.current);
+    };
   }, [sessionPaused, showSummary]);
 
   const totalFalasSession = Object.values(stats).reduce((a: number, b: number) => a + b, 0);
@@ -343,7 +373,12 @@ function TelaGerenciador({ config, onFinalizar }: { config: AppState, onFinaliza
     } else {
       if (timerRef.current) clearInterval(timerRef.current);
     }
-    return () => { if (timerRef.current) clearInterval(timerRef.current); };
+    return () => { 
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+    };
   }, [timerRodando, sessionPaused]);
 
   const toggleTimer = () => setTimerRodando(!timerRodando);
@@ -379,6 +414,8 @@ function TelaGerenciador({ config, onFinalizar }: { config: AppState, onFinaliza
 
   const concluirFala = (index: number) => {
     const fala = filaFalas[index];
+    if (!fala) return;
+
     setStats(prev => ({
       ...prev,
       [fala.nome]: (prev[fala.nome] || 0) + 1
@@ -440,7 +477,10 @@ function TelaGerenciador({ config, onFinalizar }: { config: AppState, onFinaliza
               </div>
             </div>
             <button 
-              onClick={onFinalizar}
+              onClick={() => {
+                localStorage.removeItem('pbl_session_state');
+                onFinalizar();
+              }}
               className="w-full py-4 bg-slate-900 text-white rounded-2xl font-bold uppercase tracking-widest hover:bg-slate-800 transition-all active:scale-95 shadow-lg"
             >
               Voltar ao Cadastro
@@ -734,6 +774,34 @@ function TelaGerenciador({ config, onFinalizar }: { config: AppState, onFinaliza
 export default function App() {
   const [screen, setScreen] = useState<Screen>('cadastro');
   const [config, setConfig] = useState<AppState | null>(null);
+  const [isInitialized, setIsInitialized] = useState(false);
+
+  // Recovery: Load screen and config from localStorage
+  useEffect(() => {
+    const savedScreen = localStorage.getItem('pbl_app_screen');
+    const savedConfig = localStorage.getItem('pbl_app_config');
+    
+    if (savedScreen && savedConfig) {
+      setScreen(savedScreen as Screen);
+      try {
+        setConfig(JSON.parse(savedConfig));
+      } catch (e) {
+        console.error("Erro ao recuperar config:", e);
+      }
+    }
+    setIsInitialized(true);
+  }, []);
+
+  useEffect(() => {
+    if (isInitialized) {
+      localStorage.setItem('pbl_app_screen', screen);
+      if (config) {
+        localStorage.setItem('pbl_app_config', JSON.stringify(config));
+      } else {
+        localStorage.removeItem('pbl_app_config');
+      }
+    }
+  }, [screen, config, isInitialized]);
 
   const handleIniciar = (data: AppState) => {
     setConfig(data);
@@ -741,9 +809,14 @@ export default function App() {
   };
 
   const handleFinalizar = () => {
+    localStorage.removeItem('pbl_app_screen');
+    localStorage.removeItem('pbl_app_config');
+    localStorage.removeItem('pbl_session_state');
     setScreen('cadastro');
     setConfig(null);
   };
+
+  if (!isInitialized) return <div className="min-h-screen bg-slate-50" />;
 
   return (
     <main className="min-h-screen bg-slate-50 font-sans text-slate-900 selection:bg-teal-200">
