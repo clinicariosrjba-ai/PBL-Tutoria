@@ -193,6 +193,10 @@ function TelaCadastro({ onIniciar }: { onIniciar: (config: AppState) => void }) 
                 value={inputAluno}
                 onChange={(e) => setInputAluno(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && addAluno()}
+                spellCheck={false}
+                autoComplete="off"
+                autoCorrect="off"
+                autoCapitalize="off"
               />
               <button 
                 onClick={addAluno} 
@@ -234,6 +238,10 @@ function TelaCadastro({ onIniciar }: { onIniciar: (config: AppState) => void }) 
                 value={inputObjetivo}
                 onChange={(e) => setInputObjetivo(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && addObjetivo()}
+                spellCheck={false}
+                autoComplete="off"
+                autoCorrect="off"
+                autoCapitalize="off"
               />
               <button 
                 onClick={addObjetivo} 
