@@ -1,0 +1,6 @@
+{
+  "name": "PBL - Sessão de Tutoria",
+  "description": "A tool to manage student speeches and study objectives during PBL tutoring sessions, featuring a reorderable queue and timers.",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
+}
