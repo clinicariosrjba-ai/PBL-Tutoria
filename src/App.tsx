@@ -501,18 +501,6 @@ function TelaGerenciador({ config, onFinalizar }: { config: AppState, onFinaliza
         </div>
         <div className="flex items-center gap-3">
           <button 
-            onClick={() => setSessionPaused(!sessionPaused)}
-            className={cn(
-              "px-4 py-2 rounded-md text-xs font-bold transition-all flex items-center gap-2",
-              sessionPaused 
-                ? "bg-amber-500 hover:bg-amber-600 text-white animate-pulse" 
-                : "bg-white/10 hover:bg-white/20 text-white border border-white/20"
-            )}
-          >
-            {sessionPaused ? <PlayCircle size={16} /> : <PauseCircle size={16} />}
-            {sessionPaused ? "RETOMAR SESSÃO" : "PAUSAR SESSÃO"}
-          </button>
-          <button 
             onClick={() => setShowSummary(true)}
             className="bg-red-500 hover:bg-red-600 px-6 py-2 rounded-md text-sm font-bold transition-colors shadow-sm"
           >
@@ -749,15 +737,34 @@ function TelaGerenciador({ config, onFinalizar }: { config: AppState, onFinaliza
                 </div>
               </div>
 
-              <div className="p-5 bg-slate-50 rounded-xl border border-slate-100 shadow-sm flex items-center justify-between">
+              <div 
+                onClick={() => setSessionPaused(!sessionPaused)}
+                className={cn(
+                  "p-5 rounded-xl border-2 shadow-sm flex items-center justify-between cursor-pointer transition-all active:scale-95 group",
+                  sessionPaused 
+                    ? "bg-amber-50 border-amber-300 shadow-amber-100" 
+                    : "bg-slate-50 border-slate-100 hover:border-teal-300"
+                )}
+              >
                 <div>
                   <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mb-1">Tempo Ativo</p>
-                  <p className="text-2xl font-mono font-bold text-slate-800">
+                  <p className={cn(
+                    "text-2xl font-mono font-bold transition-colors",
+                    sessionPaused ? "text-amber-600" : "text-slate-800"
+                  )}>
                     {formatarTempo(totalActiveSeconds)}
                   </p>
                 </div>
-                <div className="text-right">
-                   <span className="text-[10px] text-teal-600 font-black uppercase bg-teal-50 px-2 py-1 rounded">Sessão</span>
+                <div className="text-right flex flex-col items-end gap-1">
+                   <span className={cn(
+                     "text-[10px] font-black uppercase px-2 py-1 rounded transition-colors",
+                     sessionPaused ? "bg-amber-400 text-white animate-pulse" : "bg-teal-50 text-teal-600 group-hover:bg-teal-100"
+                   )}>
+                     {sessionPaused ? "Pausado" : "Sessão"}
+                   </span>
+                   <div className="text-slate-400">
+                     {sessionPaused ? <PlayCircle size={16} /> : <PauseCircle size={16} />}
+                   </div>
                 </div>
               </div>
             </div>
@@ -802,6 +809,17 @@ export default function App() {
       }
     }
   }, [screen, config, isInitialized]);
+
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (screen === 'gerenciador') {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [screen]);
 
   const handleIniciar = (data: AppState) => {
     setConfig(data);
