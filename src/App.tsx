@@ -47,11 +47,12 @@ interface SortableItemProps {
   total: number;
   isPrimeiro: boolean;
   onConcluir: () => void;
+  onContribuir: (nome: string) => void;
   onMover: (direcao: 'cima' | 'baixo') => void;
   timerContent?: React.ReactNode;
 }
 
-function SortableItem({ id, fala, index, total, isPrimeiro, onConcluir, onMover, timerContent }: SortableItemProps) {
+function SortableItem({ id, fala, index, total, isPrimeiro, onConcluir, onContribuir, onMover, timerContent }: SortableItemProps) {
   const {
     attributes,
     listeners,
@@ -93,6 +94,14 @@ function SortableItem({ id, fala, index, total, isPrimeiro, onConcluir, onMover,
           </div>
           
           <div className="flex items-center gap-3">
+            <button 
+              onClick={() => onContribuir(fala.nome)}
+              className="px-4 h-14 rounded-xl border-2 border-amber-200 text-amber-700 font-black text-[10px] uppercase tracking-widest hover:bg-amber-50 hover:border-amber-400 transition-all active:scale-95 flex items-center gap-2"
+              title="Abrir intervenção de colega"
+            >
+              <PlusCircle size={16} />
+              Intervenção
+            </button>
             <div className="flex flex-col gap-1">
               <button 
                 onClick={() => onMover('baixo')}
@@ -334,8 +343,16 @@ function TelaGerenciador({ config, onFinalizar }: { config: AppState, onFinaliza
   const [sessionPaused, setSessionPaused] = useState(false);
   const [totalActiveSeconds, setTotalActiveSeconds] = useState(0);
   const [showSummary, setShowSummary] = useState(false);
-  const [stats, setStats] = useState<Record<string, number>>({});
+  
+  // Intervenção State
+  const [intervencaoAtiva, setIntervencaoAtiva] = useState(false);
+  const [intervencaoNome, setIntervencaoNome] = useState<string | null>(null);
+  const [segundosIntervencao, setSegundosIntervencao] = useState(60);
+  const [extensoesIntervencao, setExtensoesIntervencao] = useState(0);
+  const [selecionandoInterventor, setSelecionandoInterventor] = useState(false);
+
   const timerRef = useRef<any>(null);
+  const intervencaoTimerRef = useRef<any>(null);
   const sessionTimerRef = useRef<any>(null);
 
   // Persistence: Save state to localStorage
@@ -348,7 +365,6 @@ function TelaGerenciador({ config, onFinalizar }: { config: AppState, onFinaliza
         setFilaFalas(parsed.filaFalas || []);
         setObjetivosFinalizados(parsed.objetivosFinalizados || []);
         setTotalActiveSeconds(parsed.totalActiveSeconds || 0);
-        setStats(parsed.stats || {});
       } catch (e) {
         console.error("Erro ao carregar estado salvo:", e);
       }
@@ -361,10 +377,9 @@ function TelaGerenciador({ config, onFinalizar }: { config: AppState, onFinaliza
       filaFalas,
       objetivosFinalizados,
       totalActiveSeconds,
-      stats
     };
     localStorage.setItem('pbl_session_state', JSON.stringify(stateToSave));
-  }, [objetivoAtual, filaFalas, objetivosFinalizados, totalActiveSeconds, stats]);
+  }, [objetivoAtual, filaFalas, objetivosFinalizados, totalActiveSeconds]);
 
   useEffect(() => {
     sessionTimerRef.current = setInterval(() => {
@@ -376,13 +391,6 @@ function TelaGerenciador({ config, onFinalizar }: { config: AppState, onFinaliza
       if (sessionTimerRef.current) clearInterval(sessionTimerRef.current);
     };
   }, [sessionPaused, showSummary]);
-
-  const totalFalasSession = Object.values(stats).reduce((a: number, b: number) => a + b, 0);
-  const totalAlunosParticipantes = Object.keys(stats).length;
-  
-  const equityScore = config.alunos.length > 0 
-    ? Math.round((totalAlunosParticipantes / config.alunos.length) * 100)
-    : 0;
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -399,7 +407,7 @@ function TelaGerenciador({ config, onFinalizar }: { config: AppState, onFinaliza
   };
 
   useEffect(() => {
-    if (timerRodando && !sessionPaused) {
+    if (timerRodando && !sessionPaused && !intervencaoAtiva) {
       timerRef.current = setInterval(() => {
         setSegundosRestantes((prev) => {
           if (prev <= 1) {
@@ -419,7 +427,27 @@ function TelaGerenciador({ config, onFinalizar }: { config: AppState, onFinaliza
         timerRef.current = null;
       }
     };
-  }, [timerRodando, sessionPaused]);
+  }, [timerRodando, sessionPaused, intervencaoAtiva]);
+
+  // Intervenção Timer logic
+  useEffect(() => {
+    if (intervencaoAtiva && !sessionPaused) {
+      intervencaoTimerRef.current = setInterval(() => {
+        setSegundosIntervencao((prev) => {
+          if (prev <= 1) {
+            if (intervencaoTimerRef.current) clearInterval(intervencaoTimerRef.current);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    } else {
+      if (intervencaoTimerRef.current) clearInterval(intervencaoTimerRef.current);
+    }
+    return () => {
+      if (intervencaoTimerRef.current) clearInterval(intervencaoTimerRef.current);
+    };
+  }, [intervencaoAtiva, sessionPaused]);
 
   const toggleTimer = () => setTimerRodando(!timerRodando);
 
@@ -468,15 +496,29 @@ function TelaGerenciador({ config, onFinalizar }: { config: AppState, onFinaliza
     const fala = filaFalas[index];
     if (!fala) return;
 
-    setStats(prev => ({
-      ...prev,
-      [fala.nome]: (prev[fala.nome] || 0) + 1
-    }));
-    
     const novaFila = [...filaFalas];
     novaFila.splice(index, 1);
     setFilaFalas(novaFila);
     resetTimer();
+  };
+
+  const abrirIntervencao = (contribuinte: string) => {
+    setIntervencaoNome(contribuinte);
+    setSegundosIntervencao(60);
+    setExtensoesIntervencao(0);
+    setIntervencaoAtiva(true);
+  };
+
+  const extenderIntervencao = () => {
+    if (extensoesIntervencao < 2) {
+      setSegundosIntervencao(prev => prev + 60);
+      setExtensoesIntervencao(prev => prev + 1);
+    }
+  };
+
+  const fecharIntervencao = () => {
+    setIntervencaoAtiva(false);
+    setIntervencaoNome(null);
   };
 
   const handleDragEnd = (event: DragEndEvent) => {
@@ -511,21 +553,17 @@ function TelaGerenciador({ config, onFinalizar }: { config: AppState, onFinaliza
           </div>
           <div className="p-8 space-y-6">
             <div className="grid grid-cols-2 gap-4">
-              <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
-                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-1">Tempo Total</p>
-                <p className="text-2xl font-mono font-bold text-slate-800">{formatarTempo(totalActiveSeconds)}</p>
-              </div>
-              <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
-                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-1">Falas Realizadas</p>
-                <p className="text-2xl font-mono font-bold text-slate-800">{totalFalasSession}</p>
+              <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 col-span-2">
+                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-1 text-center">Tempo Total de Diálogo Ativo</p>
+                <p className="text-4xl font-mono font-bold text-slate-800 text-center">{formatarTempo(totalActiveSeconds)}</p>
               </div>
               <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
                 <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-1">Objetivos Concluídos</p>
                 <p className="text-2xl font-mono font-bold text-slate-800">{objetivosFinalizados.length}/{config.objetivos.length}</p>
               </div>
               <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
-                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-1">Equidade</p>
-                <p className="text-2xl font-mono font-bold text-slate-800">{equityScore}%</p>
+                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-1">Status Final</p>
+                <p className="text-xl font-bold text-teal-600 uppercase">Sessão encerrada</p>
               </div>
             </div>
             <button 
@@ -631,7 +669,64 @@ function TelaGerenciador({ config, onFinalizar }: { config: AppState, onFinaliza
         )}
 
         {/* Left: Speaking Queue */}
-        <div className="flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto flex flex-col">
+        <div className="flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto flex flex-col relative">
+          <AnimatePresence>
+            {intervencaoAtiva && (
+              <motion.div 
+                initial={{ opacity: 0, y: 50 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 50 }}
+                className="absolute bottom-8 left-8 right-8 bg-amber-500 text-white rounded-3xl shadow-2xl p-8 z-50 border-4 border-amber-300"
+              >
+                <div className="flex items-center justify-between mb-6">
+                   <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 bg-amber-600 rounded-full flex items-center justify-center font-black">
+                        <PlusCircle size={24} />
+                      </div>
+                      <div>
+                        <span className="text-[10px] font-black uppercase tracking-widest opacity-80 decoration-white">Intervenção em Curso</span>
+                        <h4 className="text-2xl font-black uppercase leading-none">{intervencaoNome}</h4>
+                      </div>
+                   </div>
+                   <button 
+                    onClick={fecharIntervencao}
+                    className="p-2 hover:bg-white/10 rounded-full transition-colors"
+                   >
+                     <X size={32} />
+                   </button>
+                </div>
+
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-8">
+                  <div className="flex flex-col items-center sm:items-start">
+                    <span className="text-[10px] font-bold uppercase mb-1 opacity-80">Tempo de Contribuição</span>
+                    <div className={cn(
+                      "text-7xl font-mono font-black tracking-tight leading-none",
+                      segundosIntervencao < 10 ? "animate-pulse text-red-100" : ""
+                    )}>
+                      {formatarTempo(segundosIntervencao)}
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col gap-3 w-full sm:w-auto">
+                    <button 
+                      onClick={extenderIntervencao}
+                      disabled={extensoesIntervencao >= 2}
+                      className="bg-white text-amber-600 px-8 py-4 rounded-xl font-black text-xs uppercase tracking-widest shadow-lg hover:bg-amber-50 transition-all active:scale-95 disabled:opacity-50"
+                    >
+                      ESTENDER +1 MINUTO ({2 - extensoesIntervencao} rest.)
+                    </button>
+                    <button 
+                      onClick={fecharIntervencao}
+                      className="bg-amber-700 text-white px-8 py-4 rounded-xl font-black text-xs uppercase tracking-widest shadow-lg hover:bg-amber-800 transition-all active:scale-95"
+                    >
+                      ENCERRAR CONTRIBUIÇÃO
+                    </button>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
           <div className="flex items-center justify-between mb-6 lg:mb-8">
             <h3 className="text-[10px] sm:text-sm font-black text-slate-400 uppercase tracking-widest">Fila de Intervenções</h3>
             <span className="text-[10px] sm:text-xs bg-slate-200 px-2 sm:px-3 py-1 rounded text-slate-600 font-bold">
@@ -656,6 +751,7 @@ function TelaGerenciador({ config, onFinalizar }: { config: AppState, onFinaliza
                   index={index}
                   total={filaFalas.length}
                   isPrimeiro={index === 0}
+                  onContribuir={() => setSelecionandoInterventor(true)}
                   onMover={(dir) => moverFila(index, dir)}
                   onConcluir={() => concluirFala(index)}
                   timerContent={
@@ -709,15 +805,42 @@ function TelaGerenciador({ config, onFinalizar }: { config: AppState, onFinaliza
         </div>
 
         {/* Right: Student Picker & Metrics */}
-        <aside className="w-full lg:w-[350px] bg-white border-t lg:border-t-0 lg:border-l border-slate-200 p-6 sm:p-8 flex flex-col gap-8 sm:gap-10 overflow-y-auto shrink-0">
+        <aside className="w-full lg:w-[350px] bg-white border-t lg:border-t-0 lg:border-l border-slate-200 p-6 sm:p-8 flex flex-col gap-8 sm:gap-10 overflow-y-auto shrink-0 relative">
           <div className="flex flex-col gap-4">
-            <h3 className="text-[10px] sm:text-sm font-black text-slate-400 uppercase tracking-widest">Adicionar à Fila</h3>
+            <div className="flex items-center justify-between">
+              <h3 className={cn(
+                "text-[10px] sm:text-sm font-black uppercase tracking-widest transition-colors",
+                selecionandoInterventor ? "text-amber-600" : "text-slate-400"
+              )}>
+                {selecionandoInterventor ? "Selecione o Contribuidor" : "Adicionar à Fila"}
+              </h3>
+              {selecionandoInterventor && (
+                <button 
+                  onClick={() => setSelecionandoInterventor(false)}
+                  className="text-[10px] font-bold text-red-500 uppercase flex items-center gap-1"
+                >
+                  <X size={12} /> Cancelar
+                </button>
+              )}
+            </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-2 gap-2">
               {config.alunos.map((aluno, i) => (
                 <button
                   key={i}
-                  onClick={() => adicionarFala(aluno)}
-                  className="px-3 py-3 bg-slate-50 border border-slate-200 rounded hover:border-teal-400 hover:text-teal-700 text-[10px] font-bold transition-all text-left truncate active:scale-95"
+                  onClick={() => {
+                    if (selecionandoInterventor) {
+                      abrirIntervencao(aluno);
+                      setSelecionandoInterventor(false);
+                    } else {
+                      adicionarFala(aluno);
+                    }
+                  }}
+                  className={cn(
+                    "px-3 py-3 border rounded text-[10px] font-bold transition-all text-left truncate active:scale-95 shadow-sm",
+                    selecionandoInterventor 
+                      ? "bg-amber-50 border-amber-300 text-amber-700 animate-pulse hover:bg-amber-100" 
+                      : "bg-slate-50 border-slate-200 hover:border-teal-400 hover:text-teal-700 hover:bg-white"
+                  )}
                 >
                   {aluno}
                 </button>
@@ -759,38 +882,8 @@ function TelaGerenciador({ config, onFinalizar }: { config: AppState, onFinaliza
           </div>
 
           <div className="flex flex-col gap-6">
-            <h3 className="text-[10px] sm:text-sm font-black text-slate-400 uppercase tracking-widest">Resumo e Equidade</h3>
-            <div className="grid grid-cols-2 lg:grid-cols-2 gap-3">
-              <div className="p-4 bg-teal-50 border border-teal-100 rounded-xl">
-                 <p className="text-[9px] text-teal-600 font-bold uppercase tracking-tight mb-1">Total Falas</p>
-                 <p className="text-xl sm:text-2xl font-black text-teal-900 leading-none">{totalFalasSession}</p>
-              </div>
-              <div className="p-4 bg-amber-50 border border-amber-100 rounded-xl">
-                 <p className="text-[9px] text-amber-600 font-bold uppercase tracking-tight mb-1">Objetivos</p>
-                 <p className="text-xl sm:text-2xl font-black text-amber-900 leading-none">{objetivosFinalizados.length}</p>
-              </div>
-            </div>
-
+            <h3 className="text-[10px] sm:text-sm font-black text-slate-400 uppercase tracking-widest">Resumo de Sessão</h3>
             <div className="space-y-6">
-              <div>
-                <div className="flex justify-between text-[10px] font-bold uppercase mb-2 tracking-widest">
-                  <span className="text-slate-500">Equidade de Discussão</span>
-                  <span className={cn(
-                    "font-black opacity-100",
-                    equityScore > 70 ? "text-green-600" : equityScore > 40 ? "text-amber-600" : "text-red-500"
-                  )}>{equityScore}%</span>
-                </div>
-                <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                  <div 
-                    className={cn(
-                      "h-full transition-all duration-700",
-                      equityScore > 70 ? "bg-green-500" : equityScore > 40 ? "bg-amber-500" : "bg-red-500"
-                    )}
-                    style={{ width: `${equityScore}%` }}
-                  ></div>
-                </div>
-              </div>
-
               <div 
                 onClick={() => setSessionPaused(!sessionPaused)}
                 className={cn(
@@ -801,7 +894,7 @@ function TelaGerenciador({ config, onFinalizar }: { config: AppState, onFinaliza
                 )}
               >
                 <div>
-                  <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mb-1">Tempo Ativo</p>
+                  <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mb-1">Tempo Ativo Total</p>
                   <p className={cn(
                     "text-2xl font-mono font-bold transition-colors",
                     sessionPaused ? "text-amber-600" : "text-slate-800"
@@ -820,6 +913,12 @@ function TelaGerenciador({ config, onFinalizar }: { config: AppState, onFinaliza
                      {sessionPaused ? <PlayCircle size={16} /> : <PauseCircle size={16} />}
                    </div>
                 </div>
+              </div>
+
+              <div className="p-4 bg-teal-50 border border-teal-100 rounded-xl">
+                 <p className="text-[9px] text-teal-600 font-bold uppercase tracking-tight mb-1">Objetivos Concluídos</p>
+                 <p className="text-xl sm:text-2xl font-black text-teal-900 leading-none">{objetivosFinalizados.length}/{config.objetivos.length}</p>
+                 <p className="text-[9px] text-teal-400 mt-2 font-medium">Equilíbrio e foco no aprendizado.</p>
               </div>
             </div>
           </div>
