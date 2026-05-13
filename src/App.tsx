@@ -8,6 +8,8 @@ import {
   PlusCircle, 
   ChevronLeft, 
   ChevronRight, 
+  ChevronUp,
+  ChevronDown,
   PlayCircle, 
   PauseCircle, 
   CheckCircle, 
@@ -42,12 +44,14 @@ interface SortableItemProps {
   id: string;
   fala: FalaPendente;
   index: number;
+  total: number;
   isPrimeiro: boolean;
   onConcluir: () => void;
+  onMover: (direcao: 'cima' | 'baixo') => void;
   timerContent?: React.ReactNode;
 }
 
-function SortableItem({ id, fala, index, isPrimeiro, onConcluir, timerContent }: SortableItemProps) {
+function SortableItem({ id, fala, index, total, isPrimeiro, onConcluir, onMover, timerContent }: SortableItemProps) {
   const {
     attributes,
     listeners,
@@ -89,6 +93,16 @@ function SortableItem({ id, fala, index, isPrimeiro, onConcluir, timerContent }:
           </div>
           
           <div className="flex items-center gap-3">
+            <div className="flex flex-col gap-1">
+              <button 
+                onClick={() => onMover('baixo')}
+                disabled={total <= 1}
+                className="p-2 border border-slate-200 rounded-lg text-slate-400 hover:text-teal-600 hover:border-teal-200 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                title="Mover para baixo"
+              >
+                <ChevronDown size={20} />
+              </button>
+            </div>
              <button 
               onClick={onConcluir}
               className="w-14 h-14 rounded-full bg-green-500 text-white flex items-center justify-center hover:bg-green-600 shadow-lg transition-all hover:scale-105 active:scale-95"
@@ -113,8 +127,6 @@ function SortableItem({ id, fala, index, isPrimeiro, onConcluir, timerContent }:
       ref={setNodeRef}
       style={style}
       className="bg-slate-100 border border-slate-200 rounded-lg p-4 mb-3 flex items-center justify-between group hover:bg-white hover:border-teal-300 transition-all cursor-move"
-      {...attributes}
-      {...listeners}
     >
       <div className="flex items-center gap-4">
         <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center text-slate-400 font-bold border border-slate-200 text-xs">
@@ -122,11 +134,31 @@ function SortableItem({ id, fala, index, isPrimeiro, onConcluir, timerContent }:
         </div>
         <span className="font-bold text-slate-700">{fala.nome}</span>
       </div>
-      <div className="opacity-0 group-hover:opacity-30 transition-opacity">
-        <div className="flex flex-col gap-1">
-          <div className="w-5 h-1 bg-slate-400 rounded-full"></div>
-          <div className="w-5 h-1 bg-slate-400 rounded-full"></div>
-          <div className="w-5 h-1 bg-slate-400 rounded-full"></div>
+      
+      <div className="flex items-center gap-3">
+        <div className="flex gap-1">
+          <button 
+            onClick={(e) => { e.stopPropagation(); onMover('cima'); }}
+            className="p-1.5 rounded bg-white text-slate-400 hover:text-teal-600 hover:shadow-sm transition-all"
+            title="Mover para cima"
+          >
+            <ChevronUp size={18} />
+          </button>
+          <button 
+            onClick={(e) => { e.stopPropagation(); onMover('baixo'); }}
+            disabled={index === total - 1}
+            className="p-1.5 rounded bg-white text-slate-400 hover:text-teal-600 hover:shadow-sm disabled:opacity-20 transition-all"
+            title="Mover para baixo"
+          >
+            <ChevronDown size={18} />
+          </button>
+        </div>
+        
+        <div 
+          {...attributes} {...listeners}
+          className="opacity-0 group-hover:opacity-30 transition-opacity p-2 cursor-grab active:cursor-grabbing hover:bg-slate-200 rounded-md"
+        >
+          <GripVertical size={20} />
         </div>
       </div>
     </div>
@@ -420,6 +452,18 @@ function TelaGerenciador({ config, onFinalizar }: { config: AppState, onFinaliza
     setFilaFalas([...filaFalas, novaFala]);
   };
 
+  const moverFila = (index: number, direcao: 'cima' | 'baixo') => {
+    const novaFila = [...filaFalas];
+    const targetIndex = direcao === 'cima' ? index - 1 : index + 1;
+    
+    if (targetIndex >= 0 && targetIndex < novaFila.length) {
+      const temp = novaFila[index];
+      novaFila[index] = novaFila[targetIndex];
+      novaFila[targetIndex] = temp;
+      setFilaFalas(novaFila);
+    }
+  };
+
   const concluirFala = (index: number) => {
     const fala = filaFalas[index];
     if (!fala) return;
@@ -610,7 +654,9 @@ function TelaGerenciador({ config, onFinalizar }: { config: AppState, onFinaliza
                   id={fala.id}
                   fala={fala}
                   index={index}
+                  total={filaFalas.length}
                   isPrimeiro={index === 0}
+                  onMover={(dir) => moverFila(index, dir)}
                   onConcluir={() => concluirFala(index)}
                   timerContent={
                     index === 0 && (
