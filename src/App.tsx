@@ -234,10 +234,10 @@ function TelaCadastro({ onIniciar }: { onIniciar: (config: AppState) => void }) 
                 value={inputAluno}
                 onChange={(e) => setInputAluno(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && addAluno()}
-                spellCheck={false}
+                spellCheck="false"
                 autoComplete="off"
                 autoCorrect="off"
-                autoCapitalize="off"
+                autoCapitalize="none"
               />
               <button 
                 onClick={addAluno} 
@@ -279,10 +279,10 @@ function TelaCadastro({ onIniciar }: { onIniciar: (config: AppState) => void }) 
                 value={inputObjetivo}
                 onChange={(e) => setInputObjetivo(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && addObjetivo()}
-                spellCheck={false}
+                spellCheck="false"
                 autoComplete="off"
                 autoCorrect="off"
-                autoCapitalize="off"
+                autoCapitalize="none"
               />
               <button 
                 onClick={addObjetivo} 
@@ -343,6 +343,7 @@ function TelaGerenciador({ config, onFinalizar }: { config: AppState, onFinaliza
   const [sessionPaused, setSessionPaused] = useState(false);
   const [totalActiveSeconds, setTotalActiveSeconds] = useState(0);
   const [showSummary, setShowSummary] = useState(false);
+  const [stats, setStats] = useState<Record<string, number>>({});
   
   // Intervenção State
   const [intervencaoAtiva, setIntervencaoAtiva] = useState(false);
@@ -365,6 +366,7 @@ function TelaGerenciador({ config, onFinalizar }: { config: AppState, onFinaliza
         setFilaFalas(parsed.filaFalas || []);
         setObjetivosFinalizados(parsed.objetivosFinalizados || []);
         setTotalActiveSeconds(parsed.totalActiveSeconds || 0);
+        setStats(parsed.stats || {});
       } catch (e) {
         console.error("Erro ao carregar estado salvo:", e);
       }
@@ -377,9 +379,10 @@ function TelaGerenciador({ config, onFinalizar }: { config: AppState, onFinaliza
       filaFalas,
       objetivosFinalizados,
       totalActiveSeconds,
+      stats
     };
     localStorage.setItem('pbl_session_state', JSON.stringify(stateToSave));
-  }, [objetivoAtual, filaFalas, objetivosFinalizados, totalActiveSeconds]);
+  }, [objetivoAtual, filaFalas, objetivosFinalizados, totalActiveSeconds, stats]);
 
   useEffect(() => {
     sessionTimerRef.current = setInterval(() => {
@@ -391,6 +394,13 @@ function TelaGerenciador({ config, onFinalizar }: { config: AppState, onFinaliza
       if (sessionTimerRef.current) clearInterval(sessionTimerRef.current);
     };
   }, [sessionPaused, showSummary]);
+
+  const totalFalasSession = Object.values(stats).reduce((a: number, b: number) => a + b, 0);
+  const totalAlunosParticipantes = Object.keys(stats).length;
+  
+  const equityScore = config.alunos.length > 0 
+    ? Math.round((totalAlunosParticipantes / config.alunos.length) * 100)
+    : 0;
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -496,6 +506,11 @@ function TelaGerenciador({ config, onFinalizar }: { config: AppState, onFinaliza
     const fala = filaFalas[index];
     if (!fala) return;
 
+    setStats(prev => ({
+      ...prev,
+      [fala.nome]: (prev[fala.nome] || 0) + 1
+    }));
+
     const novaFila = [...filaFalas];
     novaFila.splice(index, 1);
     setFilaFalas(novaFila);
@@ -507,6 +522,12 @@ function TelaGerenciador({ config, onFinalizar }: { config: AppState, onFinaliza
     setSegundosIntervencao(60);
     setExtensoesIntervencao(0);
     setIntervencaoAtiva(true);
+    
+    // Contabiliza participação na intervenção também
+    setStats(prev => ({
+      ...prev,
+      [contribuinte]: (prev[contribuinte] || 0) + 1
+    }));
   };
 
   const extenderIntervencao = () => {
@@ -556,6 +577,10 @@ function TelaGerenciador({ config, onFinalizar }: { config: AppState, onFinaliza
               <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 col-span-2">
                 <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-1 text-center">Tempo Total de Diálogo Ativo</p>
                 <p className="text-4xl font-mono font-bold text-slate-800 text-center">{formatarTempo(totalActiveSeconds)}</p>
+              </div>
+              <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-1">Participação (Equidade)</p>
+                <p className="text-2xl font-mono font-bold text-slate-800">{equityScore}%</p>
               </div>
               <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
                 <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-1">Objetivos Concluídos</p>
@@ -918,7 +943,26 @@ function TelaGerenciador({ config, onFinalizar }: { config: AppState, onFinaliza
               <div className="p-4 bg-teal-50 border border-teal-100 rounded-xl">
                  <p className="text-[9px] text-teal-600 font-bold uppercase tracking-tight mb-1">Objetivos Concluídos</p>
                  <p className="text-xl sm:text-2xl font-black text-teal-900 leading-none">{objetivosFinalizados.length}/{config.objetivos.length}</p>
-                 <p className="text-[9px] text-teal-400 mt-2 font-medium">Equilíbrio e foco no aprendizado.</p>
+              </div>
+
+              <div>
+                <div className="flex justify-between text-[10px] font-bold uppercase mb-2 tracking-widest px-1">
+                  <span className="text-slate-500">Equidade (Participação)</span>
+                  <span className={cn(
+                    "font-black",
+                    equityScore > 70 ? "text-green-600" : equityScore > 40 ? "text-amber-600" : "text-red-500"
+                  )}>{equityScore}%</span>
+                </div>
+                <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                  <div 
+                    className={cn(
+                      "h-full transition-all duration-700",
+                      equityScore > 70 ? "bg-green-500" : equityScore > 40 ? "bg-amber-500" : "bg-red-500"
+                    )}
+                    style={{ width: `${equityScore}%` }}
+                  ></div>
+                </div>
+                <p className="text-[9px] text-slate-400 mt-2 font-medium px-1">Alunos que participaram ao menos uma vez.</p>
               </div>
             </div>
           </div>
