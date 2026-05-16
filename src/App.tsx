@@ -350,7 +350,7 @@ function TelaCadastro({ onIniciar }: { onIniciar: (config: AppState) => void }) 
 function TelaGerenciador({ config, onFinalizar }: { config: AppState, onFinalizar: () => void }) {
   const [objetivoAtual, setObjetivoAtual] = useState(0);
   const [filaFalas, setFilaFalas] = useState<FalaPendente[]>([]);
-  const [segundosRestantes, setSegundosRestantes] = useState(60);
+  const [segundosRestantes, setSegundosRestantes] = useState(180);
   const [extensoesUsadas, setExtensoesUsadas] = useState(0);
   const [timerRodando, setTimerRodando] = useState(false);
   const [startTime] = useState(Date.now());
@@ -435,7 +435,7 @@ function TelaGerenciador({ config, onFinalizar }: { config: AppState, onFinaliza
 
   const resetTimer = () => {
     if (timerRef.current) clearInterval(timerRef.current);
-    setSegundosRestantes(60);
+    setSegundosRestantes(180);
     setExtensoesUsadas(0);
     setTimerRodando(false);
   };
@@ -515,7 +515,7 @@ function TelaGerenciador({ config, onFinalizar }: { config: AppState, onFinaliza
 
   const adicionarTempo = () => {
     if (extensoesUsadas < 2) {
-      setSegundosRestantes(prev => prev + 60);
+      setSegundosRestantes(prev => prev + 180);
       setExtensoesUsadas(prev => prev + 1);
     }
   };
@@ -943,7 +943,7 @@ function TelaGerenciador({ config, onFinalizar }: { config: AppState, onFinaliza
                                     "bg-amber-400 hover:bg-amber-500 text-amber-900 px-4 sm:px-6 h-12 sm:h-14 rounded font-black text-[10px] sm:text-xs uppercase tracking-tight shadow-md transition-all active:scale-95 disabled:opacity-30 flex-1 sm:flex-none",
                                   )}
                                 >
-                                  <span>+1 MINUTO</span>
+                                  <span>+3 MINUTOS</span>
                                   <div className="text-[9px] font-bold opacity-60">({2 - extensoesUsadas} Restantes)</div>
                                 </button>
                             </div>
