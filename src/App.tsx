@@ -823,7 +823,7 @@ function TelaGerenciador({ config, onFinalizar }: { config: AppState, onFinaliza
                       onClick={fecharTutorIntervencao}
                       className="bg-white text-teal-800 px-8 py-4 rounded-xl font-black text-xs uppercase tracking-widest shadow-lg hover:bg-slate-50 transition-all active:scale-95"
                     >
-                      ENCERRAR TUTORIA
+                      ENCERRAR INTERVENÇÃO
                     </button>
                   </div>
                 </div>
@@ -1133,6 +1133,21 @@ function TelaGerenciador({ config, onFinalizar }: { config: AppState, onFinaliza
                   ></div>
                 </div>
                 <p className="text-[9px] text-slate-400 mt-2 font-medium px-1">Alunos que participaram ao menos uma vez.</p>
+                
+                <div className="mt-4 grid grid-cols-2 gap-3">
+                  <div className="bg-slate-50 p-3 rounded-lg border border-slate-100">
+                    <p className="text-[8px] text-slate-400 font-bold uppercase tracking-widest mb-1">Total Alunos</p>
+                    <p className="text-sm font-bold text-slate-700">{config.alunos.length}</p>
+                  </div>
+                  <div className="bg-slate-50 p-3 rounded-lg border border-slate-100">
+                    <p className="text-[8px] text-slate-400 font-bold uppercase tracking-widest mb-1">Já Falaram</p>
+                    <p className="text-sm font-bold text-teal-600">{totalAlunosParticipantes}</p>
+                  </div>
+                  <div className="bg-slate-50 p-3 rounded-lg border border-slate-100 col-span-2">
+                    <p className="text-[8px] text-slate-400 font-bold uppercase tracking-widest mb-1">Faltam Falar</p>
+                    <p className="text-sm font-bold text-amber-600">{config.alunos.length - totalAlunosParticipantes}</p>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
