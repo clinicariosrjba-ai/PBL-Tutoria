@@ -49,10 +49,11 @@ interface SortableItemProps {
   onConcluir: () => void;
   onContribuir: (nome: string) => void;
   onMover: (direcao: 'cima' | 'baixo') => void;
+  onRemover: () => void;
   timerContent?: React.ReactNode;
 }
 
-function SortableItem({ id, fala, index, total, isPrimeiro, onConcluir, onContribuir, onMover, timerContent }: SortableItemProps) {
+function SortableItem({ id, fala, index, total, isPrimeiro, onConcluir, onContribuir, onMover, onRemover, timerContent }: SortableItemProps) {
   const {
     attributes,
     listeners,
@@ -112,6 +113,13 @@ function SortableItem({ id, fala, index, total, isPrimeiro, onConcluir, onContri
                 <ChevronDown size={20} />
               </button>
             </div>
+            <button 
+              onClick={onRemover}
+              className="w-14 h-14 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center hover:bg-red-50 hover:text-red-500 border border-slate-200 transition-all active:scale-95"
+              title="Remover da fila"
+            >
+              <X size={24} />
+            </button>
              <button 
               onClick={onConcluir}
               className="w-14 h-14 rounded-full bg-green-500 text-white flex items-center justify-center hover:bg-green-600 shadow-lg transition-all hover:scale-105 active:scale-95"
@@ -146,6 +154,13 @@ function SortableItem({ id, fala, index, total, isPrimeiro, onConcluir, onContri
       
       <div className="flex items-center gap-3">
         <div className="flex gap-1">
+          <button 
+            onClick={(e) => { e.stopPropagation(); onRemover(); }}
+            className="p-1.5 rounded bg-white text-slate-400 hover:text-red-500 hover:shadow-sm transition-all"
+            title="Remover da fila"
+          >
+            <X size={18} />
+          </button>
           <button 
             onClick={(e) => { e.stopPropagation(); onMover('cima'); }}
             className="p-1.5 rounded bg-white text-slate-400 hover:text-teal-600 hover:shadow-sm transition-all"
@@ -546,6 +561,14 @@ function TelaGerenciador({ config, onFinalizar }: { config: AppState, onFinaliza
     resetTimer();
   };
 
+  const removerDaFila = (id: string) => {
+    setFilaFalas(prev => prev.filter(f => f.id !== id));
+    // Se o primeiro for removido, resetamos o timer
+    if (filaFalas.length > 0 && filaFalas[0].id === id) {
+      resetTimer();
+    }
+  };
+
   const abrirIntervencao = (contribuinte: string) => {
     setIntervencaoNome(contribuinte);
     setSegundosIntervencao(60);
@@ -632,9 +655,19 @@ function TelaGerenciador({ config, onFinalizar }: { config: AppState, onFinaliza
                 <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-1">Objetivos Concluídos</p>
                 <p className="text-2xl font-mono font-bold text-slate-800">{objetivosFinalizados.length}/{config.objetivos.length}</p>
               </div>
-              <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
-                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-1">Status Final</p>
-                <p className="text-xl font-bold text-teal-600 uppercase">Sessão encerrada</p>
+              <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 col-span-2">
+                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-1 text-center">Avaliação da Tutoria</p>
+                <p className="text-2xl font-black text-teal-600 uppercase text-center mt-1">
+                  {avaliacaoTutor === 'ruim' && '😭 Ruim'}
+                  {avaliacaoTutor === 'regular' && '😐 Regular'}
+                  {avaliacaoTutor === 'boa' && '🙂 Boa'}
+                  {avaliacaoTutor === 'otima' && '🤩 Ótima'}
+                  {!avaliacaoTutor && 'Não Avaliado'}
+                </p>
+              </div>
+              <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 col-span-2">
+                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-1 text-center">Status Final</p>
+                <p className="text-xl font-bold text-teal-600 uppercase text-center">Sessão encerrada com sucesso</p>
               </div>
             </div>
             <button 
@@ -879,6 +912,7 @@ function TelaGerenciador({ config, onFinalizar }: { config: AppState, onFinaliza
                   isPrimeiro={index === 0}
                   onContribuir={() => setSelecionandoInterventor(true)}
                   onMover={(dir) => moverFila(index, dir)}
+                  onRemover={() => removerDaFila(fala.id)}
                   onConcluir={() => concluirFala(index)}
                   timerContent={
                     index === 0 && (
@@ -1018,7 +1052,7 @@ function TelaGerenciador({ config, onFinalizar }: { config: AppState, onFinaliza
             </button>
 
             <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
-               <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-3 text-center">Avaliação do Momento</p>
+               <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-3 text-center">Avaliação da Tutoria</p>
                <div className="flex justify-between gap-1">
                   {[
                     { e: '😭', l: 'Ruim', v: 'ruim' },
