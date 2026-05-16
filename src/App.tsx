@@ -335,7 +335,7 @@ function TelaCadastro({ onIniciar }: { onIniciar: (config: AppState) => void }) 
 function TelaGerenciador({ config, onFinalizar }: { config: AppState, onFinalizar: () => void }) {
   const [objetivoAtual, setObjetivoAtual] = useState(0);
   const [filaFalas, setFilaFalas] = useState<FalaPendente[]>([]);
-  const [segundosRestantes, setSegundosRestantes] = useState(180);
+  const [segundosRestantes, setSegundosRestantes] = useState(60);
   const [extensoesUsadas, setExtensoesUsadas] = useState(0);
   const [timerRodando, setTimerRodando] = useState(false);
   const [startTime] = useState(Date.now());
@@ -352,8 +352,17 @@ function TelaGerenciador({ config, onFinalizar }: { config: AppState, onFinaliza
   const [extensoesIntervencao, setExtensoesIntervencao] = useState(0);
   const [selecionandoInterventor, setSelecionandoInterventor] = useState(false);
 
+  // Intervenção do Tutor
+  const [tutorIntervencaoAtiva, setTutorIntervencaoAtiva] = useState(false);
+  const [segundosTutor, setSegundosTutor] = useState(120);
+  const [extensoesTutor, setExtensoesTutor] = useState(0);
+
+  // Avaliação
+  const [avaliacaoTutor, setAvaliacaoTutor] = useState<string | null>(null);
+
   const timerRef = useRef<any>(null);
   const intervencaoTimerRef = useRef<any>(null);
+  const tutorTimerRef = useRef<any>(null);
   const sessionTimerRef = useRef<any>(null);
 
   // Persistence: Save state to localStorage
@@ -411,13 +420,13 @@ function TelaGerenciador({ config, onFinalizar }: { config: AppState, onFinaliza
 
   const resetTimer = () => {
     if (timerRef.current) clearInterval(timerRef.current);
-    setSegundosRestantes(180);
+    setSegundosRestantes(60);
     setExtensoesUsadas(0);
     setTimerRodando(false);
   };
 
   useEffect(() => {
-    if (timerRodando && !sessionPaused && !intervencaoAtiva) {
+    if (timerRodando && !sessionPaused && !intervencaoAtiva && !tutorIntervencaoAtiva) {
       timerRef.current = setInterval(() => {
         setSegundosRestantes((prev) => {
           if (prev <= 1) {
@@ -437,11 +446,11 @@ function TelaGerenciador({ config, onFinalizar }: { config: AppState, onFinaliza
         timerRef.current = null;
       }
     };
-  }, [timerRodando, sessionPaused, intervencaoAtiva]);
+  }, [timerRodando, sessionPaused, intervencaoAtiva, tutorIntervencaoAtiva]);
 
   // Intervenção Timer logic
   useEffect(() => {
-    if (intervencaoAtiva && !sessionPaused) {
+    if (intervencaoAtiva && !sessionPaused && !tutorIntervencaoAtiva) {
       intervencaoTimerRef.current = setInterval(() => {
         setSegundosIntervencao((prev) => {
           if (prev <= 1) {
@@ -457,7 +466,27 @@ function TelaGerenciador({ config, onFinalizar }: { config: AppState, onFinaliza
     return () => {
       if (intervencaoTimerRef.current) clearInterval(intervencaoTimerRef.current);
     };
-  }, [intervencaoAtiva, sessionPaused]);
+  }, [intervencaoAtiva, sessionPaused, tutorIntervencaoAtiva]);
+
+  // Tutor Timer logic
+  useEffect(() => {
+    if (tutorIntervencaoAtiva && !sessionPaused) {
+      tutorTimerRef.current = setInterval(() => {
+        setSegundosTutor((prev) => {
+          if (prev <= 1) {
+            if (tutorTimerRef.current) clearInterval(tutorTimerRef.current);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    } else {
+      if (tutorTimerRef.current) clearInterval(tutorTimerRef.current);
+    }
+    return () => {
+      if (tutorTimerRef.current) clearInterval(tutorTimerRef.current);
+    };
+  }, [tutorIntervencaoAtiva, sessionPaused]);
 
   const toggleTimer = () => setTimerRodando(!timerRodando);
 
@@ -471,7 +500,7 @@ function TelaGerenciador({ config, onFinalizar }: { config: AppState, onFinaliza
 
   const adicionarTempo = () => {
     if (extensoesUsadas < 2) {
-      setSegundosRestantes(prev => prev + 180);
+      setSegundosRestantes(prev => prev + 60);
       setExtensoesUsadas(prev => prev + 1);
     }
   };
@@ -540,6 +569,23 @@ function TelaGerenciador({ config, onFinalizar }: { config: AppState, onFinaliza
   const fecharIntervencao = () => {
     setIntervencaoAtiva(false);
     setIntervencaoNome(null);
+  };
+
+  const abrirTutorIntervencao = () => {
+    setSegundosTutor(120);
+    setExtensoesTutor(0);
+    setTutorIntervencaoAtiva(true);
+  };
+
+  const extenderTutorIntervencao = () => {
+    if (extensoesTutor < 2) {
+      setSegundosTutor(prev => prev + 120);
+      setExtensoesTutor(prev => prev + 1);
+    }
+  };
+
+  const fecharTutorIntervencao = () => {
+    setTutorIntervencaoAtiva(false);
   };
 
   const handleDragEnd = (event: DragEndEvent) => {
@@ -696,7 +742,62 @@ function TelaGerenciador({ config, onFinalizar }: { config: AppState, onFinaliza
         {/* Left: Speaking Queue */}
         <div className="flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto flex flex-col relative">
           <AnimatePresence>
-            {intervencaoAtiva && (
+            {tutorIntervencaoAtiva && (
+              <motion.div 
+                initial={{ opacity: 0, y: 50 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 50 }}
+                className="absolute bottom-8 left-8 right-8 bg-teal-800 text-white rounded-3xl shadow-2xl p-8 z-[51] border-4 border-teal-500"
+              >
+                <div className="flex items-center justify-between mb-6">
+                   <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 bg-teal-600 rounded-full flex items-center justify-center font-black">
+                        <CheckCircle size={24} />
+                      </div>
+                      <div>
+                        <span className="text-[10px] font-black uppercase tracking-widest opacity-80 decoration-white">Orientação do Tutor</span>
+                        <h4 className="text-2xl font-black uppercase leading-none">Intervenção de Tutoria</h4>
+                      </div>
+                   </div>
+                   <button 
+                    onClick={fecharTutorIntervencao}
+                    className="p-2 hover:bg-white/10 rounded-full transition-colors"
+                   >
+                     <X size={32} />
+                   </button>
+                </div>
+
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-8">
+                  <div className="flex flex-col items-center sm:items-start">
+                    <span className="text-[10px] font-bold uppercase mb-1 opacity-80">Tempo do Tutor</span>
+                    <div className={cn(
+                      "text-7xl font-mono font-black tracking-tight leading-none",
+                      segundosTutor < 20 ? "animate-pulse text-amber-300" : ""
+                    )}>
+                      {formatarTempo(segundosTutor)}
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col gap-3 w-full sm:w-auto">
+                    <button 
+                      onClick={extenderTutorIntervencao}
+                      disabled={extensoesTutor >= 2}
+                      className="bg-teal-500 text-white px-8 py-4 rounded-xl font-black text-xs uppercase tracking-widest shadow-lg hover:bg-teal-600 transition-all active:scale-95 disabled:opacity-50"
+                    >
+                      ESTENDER +2 MINUTOS ({2 - extensoesTutor} rest.)
+                    </button>
+                    <button 
+                      onClick={fecharTutorIntervencao}
+                      className="bg-white text-teal-800 px-8 py-4 rounded-xl font-black text-xs uppercase tracking-widest shadow-lg hover:bg-slate-50 transition-all active:scale-95"
+                    >
+                      ENCERRAR TUTORIA
+                    </button>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+
+            {intervencaoAtiva && !tutorIntervencaoAtiva && (
               <motion.div 
                 initial={{ opacity: 0, y: 50 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -801,16 +902,16 @@ function TelaGerenciador({ config, onFinalizar }: { config: AppState, onFinaliza
                                 {timerRodando ? <PauseCircle size={28} className="sm:hidden" /> : <PlayCircle size={28} className="sm:hidden" />}
                                 {timerRodando ? <PauseCircle size={32} className="hidden sm:block" /> : <PlayCircle size={32} className="hidden sm:block" />}
                               </button>
-                              <button 
-                                onClick={adicionarTempo}
-                                disabled={extensoesUsadas >= 2}
-                                className={cn(
-                                  "bg-amber-400 hover:bg-amber-500 text-amber-900 px-4 sm:px-6 h-12 sm:h-14 rounded font-black text-[10px] sm:text-xs uppercase tracking-tight shadow-md transition-all active:scale-95 disabled:opacity-30 flex-1 sm:flex-none",
-                                )}
-                              >
-                                <span>+3 MINUTOS</span>
-                                <div className="text-[9px] font-bold opacity-60">({2 - extensoesUsadas} Restantes)</div>
-                              </button>
+                                <button 
+                                  onClick={adicionarTempo}
+                                  disabled={extensoesUsadas >= 2}
+                                  className={cn(
+                                    "bg-amber-400 hover:bg-amber-500 text-amber-900 px-4 sm:px-6 h-12 sm:h-14 rounded font-black text-[10px] sm:text-xs uppercase tracking-tight shadow-md transition-all active:scale-95 disabled:opacity-30 flex-1 sm:flex-none",
+                                  )}
+                                >
+                                  <span>+1 MINUTO</span>
+                                  <div className="text-[9px] font-bold opacity-60">({2 - extensoesUsadas} Restantes)</div>
+                                </button>
                             </div>
                          </div>
                       </div>
@@ -907,6 +1008,41 @@ function TelaGerenciador({ config, onFinalizar }: { config: AppState, onFinaliza
           </div>
 
           <div className="flex flex-col gap-6">
+            <h3 className="text-[10px] sm:text-sm font-black text-slate-400 uppercase tracking-widest">Ações do Tutor</h3>
+            <button 
+              onClick={abrirTutorIntervencao}
+              className="w-full py-4 bg-teal-800 text-white rounded-xl font-black text-[10px] uppercase tracking-[0.2em] shadow-lg hover:bg-teal-900 transition-all active:scale-95 flex items-center justify-center gap-2"
+            >
+              <PauseCircle size={16} />
+              Intervenção do Tutor
+            </button>
+
+            <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
+               <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-3 text-center">Avaliação do Momento</p>
+               <div className="flex justify-between gap-1">
+                  {[
+                    { e: '😭', l: 'Ruim', v: 'ruim' },
+                    { e: '😐', l: 'Regular', v: 'regular' },
+                    { e: '🙂', l: 'Boa', v: 'boa' },
+                    { e: '🤩', l: 'Ótima', v: 'otima' }
+                  ].map((item) => (
+                    <button
+                      key={item.v}
+                      onClick={() => setAvaliacaoTutor(item.v)}
+                      className={cn(
+                        "flex-1 flex flex-col items-center gap-1 p-2 rounded-lg transition-all active:scale-90",
+                        avaliacaoTutor === item.v 
+                          ? "bg-teal-100 border border-teal-200" 
+                          : "hover:bg-white hover:shadow-sm grayscale opacity-50 hover:grayscale-0 hover:opacity-100"
+                      )}
+                    >
+                      <span className="text-2xl">{item.e}</span>
+                      <span className="text-[8px] font-black uppercase text-slate-500">{item.l}</span>
+                    </button>
+                  ))}
+               </div>
+            </div>
+
             <h3 className="text-[10px] sm:text-sm font-black text-slate-400 uppercase tracking-widest">Resumo de Sessão</h3>
             <div className="space-y-6">
               <div 
